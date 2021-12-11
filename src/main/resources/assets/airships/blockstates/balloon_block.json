@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "airships:block/balloon_block"
+    }
+  }
+}

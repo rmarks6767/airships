@@ -1,5 +1,7 @@
 package com.rmarks.airships;
 
+import com.rmarks.airships.block.ModBlocks;
+import com.rmarks.airships.item.ModItems;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.eventbus.api.IEventBus;
@@ -23,7 +25,13 @@ public class AirshipsMod
 
     public AirshipsMod() {
         IEventBus eventBus = FMLJavaModLoadingContext.get().getModEventBus();
+
+        // It's registering time
+        ModBlocks.register(eventBus);
+        ModItems.register(eventBus);
+
         eventBus.addListener(this::setup);
+
         MinecraftForge.EVENT_BUS.register(this);
     }
 
