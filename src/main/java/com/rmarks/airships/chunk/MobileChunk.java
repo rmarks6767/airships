@@ -3,6 +3,7 @@ package com.rmarks.airships.chunk;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.rmarks.airships.entity.Ship;
 import net.minecraft.block.Block;
 import net.minecraft.init.Blocks;
 import net.minecraft.tileentity.TileEntity;
@@ -12,6 +13,7 @@ import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
 import net.minecraft.world.biome.BiomeGenBase;
 import net.minecraft.world.chunk.storage.ExtendedBlockStorage;
+import net.minecraft.world.level.Level;
 import net.minecraftforge.common.util.ForgeDirection;
 import ckathode.archimedes.entity.EntityShip;
 import ckathode.archimedes.entity.IShipTileEntity;
@@ -37,7 +39,7 @@ public class MobileChunk
 
     private BiomeGenBase								creationSpotBiome;
 
-    public MobileChunk(World world, EntityShip entityship)
+    public MobileChunk(Level level, Ship ship)
     {
         worldObj = world;
         entityShip = entityship;

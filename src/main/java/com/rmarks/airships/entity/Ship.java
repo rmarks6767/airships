@@ -1,11 +1,20 @@
 package com.rmarks.airships.entity;
 
-import com.rmarks.airships.ShipControllerCommon;
+import com.rmarks.airships.chunk.MobileChunkServer;
+import com.rmarks.airships.control.ShipControllerClient;
+import com.rmarks.airships.control.ShipControllerCommon;
 import com.rmarks.airships.chunk.ChunkDisassembler;
 import com.rmarks.airships.chunk.MobileChunk;
+import com.rmarks.airships.chunk.MobileChunkClient;
+import com.rmarks.airships.util.AABBRotator;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityDimensions;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.Pose;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.vehicle.Boat;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -13,6 +22,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.material.Material;
+import net.minecraft.world.phys.AABB;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.entity.IEntityAdditionalSpawnData;
@@ -56,32 +66,34 @@ import java.io.*;
         return false;
     }
 
-    private MobileChunk                                 shipChunk;
-    private ShipCapabilities		                    capabilities;
-    private ShipControllerCommon                        controller;
-    private ShipHandlerCommon		                    handler;
-    private ShipInfo				                    info;
-    private ChunkDisassembler                           disassembler;
-    public float					                    motionYaw;
-    public int						                    frontDirection;
-    public int						                    seatX, seatY, seatZ;
-    private Entity                                      prevRiddenByEntity;
-    boolean							                    isFlying;
-    protected float					                    groundFriction, horFriction, vertFriction;
-    int[]							                    layeredBlockVolumeCount;
-    private boolean					                    boatIsEmpty;
-    private boolean					                    syncPosWithServer;
-    @OnlyIn(Dist.CLIENT) private int					boatPosRotationIncrements;
-    @OnlyIn(Dist.CLIENT) private double					boatX, boatY, boatZ;
-    @OnlyIn(Dist.CLIENT) private double					boatPitch, boatYaw;
-    @OnlyIn(Dist.CLIENT) private double					boatVelX, boatVelY, boatVelZ;
+    public float motionYaw;
+    public int frontDirection;
+    public int seatX, seatY, seatZ;
+
+    protected boolean isFlying;
+    protected float groundFriction, horFriction, vertFriction;
+    protected int[] layeredBlockVolumeCount;
+
+    private MobileChunk shipChunk;
+    private ShipCapabilities capabilities;
+    private ShipControllerCommon controller;
+    private ShipHandlerCommon handler;
+    private ShipInfo info;
+    private ChunkDisassembler disassembler;
+    private Entity prevRiddenByEntity;
+    private boolean boatIsEmpty;
+    private boolean	syncPosWithServer;
+    @OnlyIn(Dist.CLIENT) private int boatPosRotationIncrements;
+    @OnlyIn(Dist.CLIENT) private double	boatX, boatY, boatZ;
+    @OnlyIn(Dist.CLIENT) private double	boatPitch, boatYaw;
+    @OnlyIn(Dist.CLIENT) private double	boatVelX, boatVelY, boatVelZ;
 
     public Ship(Level level) {
-        super();
+        super(level, 0D, 0D, 0D);
+
         info = new ShipInfo();
         capabilities = new ShipCapabilities(this);
 
-        // If it's client side, init the client, otherwise just the common
         if (level.isClientSide) initClient();
         else initCommon();
 
@@ -89,7 +101,6 @@ import java.io.*;
 
         layeredBlockVolumeCount = null;
         frontDirection = 0;
-        yOffset = 0F;
         groundFriction = 0.9F;
         horFriction = 0.994F;
         vertFriction = 0.95F;
@@ -106,25 +117,26 @@ import java.io.*;
         }
     }
 
-    @SideOnly(Side.CLIENT)
+    @OnlyIn(Dist.CLIENT)
     private void initClient()
     {
-        shipChunk = new MobileChunkClient(worldObj, this);
+
+        shipChunk = new MobileChunkClient(level, this);
         handler = new ShipHandlerClient(this);
         controller = new ShipControllerClient();
     }
 
     private void initCommon()
     {
-        shipChunk = new MobileChunkServer(worldObj, this);
+        shipChunk = new MobileChunkServer(level, this);
         handler = new ShipHandlerServer(this);
         controller = new ShipControllerCommon();
     }
 
-    @Override
+    // @Override
     protected void entityInit()
     {
-        dataWatcher.addObject(30, Byte.valueOf((byte) 0));
+        dataWatcher.addObject(30, (byte) 0);
     }
 
     public MobileChunk getShipChunk()
@@ -132,84 +144,81 @@ import java.io.*;
         return shipChunk;
     }
 
-    public ShipCapabilities getCapabilities()
-    {
-        return capabilities;
-    }
+
+    // Possibly not needed IDK?
+    // public ShipCapabilities getCapabilities() {
+    //        return capabilities;
+    //    }
 
     public ShipControllerCommon getController()
     {
         return controller;
     }
 
-
-
-
-    public ChunkDisassembler getDisassembler()
-    {
-        if (disassembler == null)
-        {
-            disassembler = new ChunkDisassembler(this);
-        }
-        return disassembler;
+    public ChunkDisassembler getDisassembler() {
+        return disassembler == null ? new ChunkDisassembler(this) : disassembler;
     }
 
-    public void setInfo(ShipInfo shipinfo)
-    {
+    public void setInfo(ShipInfo shipinfo) {
         if (shipinfo == null) throw new NullPointerException("Cannot set null ship info");
         info = shipinfo;
     }
 
-    public ShipInfo getInfo()
-    {
+    public ShipInfo getInfo() {
         return info;
     }
 
-    public void setPilotSeat(int dir, int seatx, int seaty, int seatz)
-    {
+    public void setPilotSeat(int dir, int seatX, int seatY, int seatZ) {
         frontDirection = dir;
-        seatX = seatx;
-        seatY = seaty;
-        seatZ = seatz;
+        this.seatX = seatX;
+        this.seatY = seatY;
+        this.seatZ = seatZ;
     }
 
-    @Override
-    public void setDead()
-    {
-        super.setDead();
+    public void setDead() {
         shipChunk.onChunkUnload();
         capabilities.clear();
     }
 
-    @Override
-    public void onEntityUpdate()
-    {
-        super.onEntityUpdate();
-        if (shipChunk.isModified)
-        {
+    public void onEntityUpdate() {
+        if (shipChunk.isModified) {
             shipChunk.isModified = false;
             handler.onChunkUpdate();
         }
     }
 
-    public void setRotatedBoundingBox()
-    {
-        if (shipChunk == null)
-        {
-            float hw = width / 2F;
-            boundingBox.setBounds(posX - hw, posY, posZ - hw, posX + hw, posY + height, posZ + hw);
-        } else
-        {
-            boundingBox.setBounds(posX - shipChunk.getCenterX(), posY, posZ - shipChunk.getCenterZ(), posX + shipChunk.getCenterX(), posY + height, posZ + shipChunk.getCenterZ());
-            AABBRotator.rotateAABBAroundY(boundingBox, posX, posZ, (float) Math.toRadians(rotationYaw));
+    public void setRotatedBoundingBox() {
+        if (shipChunk == null) {
+            float hw = getBbWidth() / 2F;
+            int x = getBlockX(), y = getBlockY(), z = getBlockZ();
+
+            super.setBoundingBox(
+                new AABB(x - hw, y, z - hw, x + hw, y + getEyeHeight(), z + hw)
+            );
+        }
+        else {
+            int x = getBlockX(), y = getBlockY(), z = getBlockZ();
+
+            super.setBoundingBox(
+                new AABB(
+                    x - shipChunk.getCenterX(),
+                    y,
+                    z - shipChunk.getCenterZ(),
+                    x + shipChunk.getCenterX(),
+                    y + getEyeHeight(),
+                    z + shipChunk.getCenterZ()
+                )
+            );
+
+            AABBRotator.rotateAABBAroundY(getBoundingBox(), x, z, (float) Math.toRadians(getYRot()));
         }
     }
 
-    @Override
-    public void setSize(float w, float h)
-    {
-        if (w != width || h != height)
-        {
+    public void setBounds(float w, float h) {
+        float width = getBbWidth();
+        float height = getBbHeight();
+
+        if (w != width || h != height) {
             width = w;
             height = h;
             float hw = w / 2F;
@@ -217,29 +226,28 @@ import java.io.*;
         }
 
         float f = w % 2.0F;
-        if (f < 0.375D)
-        {
+        if (f < 0.375D) {
             myEntitySize = EnumEntitySize.SIZE_1;
-        } else if (f < 0.75D)
-        {
+        }
+        else if (f < 0.75D) {
             myEntitySize = EnumEntitySize.SIZE_2;
-        } else if (f < 1.0D)
-        {
+        }
+        else if (f < 1.0D) {
             myEntitySize = EnumEntitySize.SIZE_3;
-        } else if (f < 1.375D)
-        {
+        }
+        else if (f < 1.375D) {
             myEntitySize = EnumEntitySize.SIZE_4;
-        } else if (f < 1.75D)
-        {
+        }
+        else if (f < 1.75D) {
             myEntitySize = EnumEntitySize.SIZE_5;
-        } else
-        {
+        }
+        else {
             myEntitySize = EnumEntitySize.SIZE_6;
         }
     }
 
     @Override
-    @SideOnly(Side.CLIENT)
+    @OnlyIn(Dist.CLIENT)
     public void setPositionAndRotation2(double x, double y, double z, float yaw, float pitch, int incr)
     {
         if (boatIsEmpty)
@@ -272,7 +280,7 @@ import java.io.*;
     }
 
     @Override
-    @SideOnly(Side.CLIENT)
+    @OnlyIn(Dist.CLIENT)
     public void setVelocity(double x, double y, double z)
     {
         boatVelX = motionX = x;
@@ -311,7 +319,7 @@ import java.io.*;
         }
     }
 
-    @SideOnly(Side.CLIENT)
+    @OnlyIn(Dist.CLIENT)
     protected void handleClientUpdate()
     {
         if (boatPosRotationIncrements > 0)
@@ -670,7 +678,7 @@ import java.io.*;
         return ticksExisted > 60;
     }
 
-    @SideOnly(Side.CLIENT)
+    @OnlyIn(Dist.CLIENT)
     protected void spawnParticles(double horvel)
     {
 		/*if (isInWater() && horvel > 0.1625D)
@@ -706,8 +714,7 @@ import java.io.*;
         }
     }
 
-    @Override
-    @SideOnly(Side.CLIENT)
+    @OnlyIn(Dist.CLIENT)
     public void setIsBoatEmpty(boolean flag)
     {
         boatIsEmpty = flag;
@@ -719,16 +726,13 @@ import java.io.*;
         return true;
     }
 
-    @Override
     public void updateRiderPosition()
     {
-        updateRiderPosition(riddenByEntity, seatX, seatY, seatZ, 1);
+        updateRiderPosition(getFirstPassenger(), seatX, seatY, seatZ, 1);
     }
 
-    public void updateRiderPosition(Entity entity, int seatx, int seaty, int seatz, int flags)
-    {
-        if (entity != null)
-        {
+    public void updateRiderPosition(Entity entity, int seatx, int seaty, int seatz, int flags) {
+        if (entity != null) {
             float yaw = (float) Math.toRadians(rotationYaw);
             float pitch = (float) Math.toRadians(rotationPitch);
 
@@ -782,9 +786,8 @@ import java.io.*;
     }
 
     @Override
-    public double getMountedYOffset()
-    {
-        return yOffset + 0.5D;
+    public double getPassengersRidingOffset() {
+      return 0.5D;
     }
 
     @Override
@@ -801,13 +804,7 @@ import java.io.*;
     }
 
     @Override
-    public AxisAlignedBB getBoundingBox()
-    {
-        return boundingBox;
-    }
-
-    @Override
-    public boolean canBePushed()
+    public boolean isPushable()
     {
         return onGround && !isInWater() && riddenByEntity == null;
     }
@@ -839,36 +836,15 @@ import java.io.*;
         return false;
     }
 
-    @Override
-    protected void updateFallState(double distancefallen, boolean onground)
-    {
-        if (!isFlying())
-        {
-
-        }
-    }
-
-    @Override
-    protected void fall(float distance)
-    {
-    }
-
-    @Override
-    @SideOnly(Side.CLIENT)
-    public float getShadowSize()
-    {
-        return 0.5F;
-    }
-
     public float getHorizontalVelocity()
     {
         return (float) Math.sqrt(motionX * motionX + motionZ * motionZ);
     }
 
     @Override
-    public boolean interactFirst(EntityPlayer entityplayer)
+    public boolean interact(Player player, InteractionHand hand)
     {
-        return handler.interact(entityplayer);
+        return handler.interact(player);
     }
 
     public void alignToGrid()

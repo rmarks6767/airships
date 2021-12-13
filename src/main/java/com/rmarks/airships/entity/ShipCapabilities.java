@@ -12,7 +12,7 @@ import ckathode.archimedes.blockitem.TileEntityEngine;
 
 public final class ShipCapabilities
 {
-    private final EntityShip				ship;
+    private final Ship				        ship;
     public float							speedMultiplier, rotationMultiplier, liftMultiplier;
     public float							brakeMult;
     private int								balloons;
@@ -25,9 +25,8 @@ public final class ShipCapabilities
 
     //private FuelInventory					fuelInventory;
 
-    ShipCapabilities(EntityShip entityship)
-    {
-        ship = entityship;
+    ShipCapabilities(Ship ship) {
+        this.ship = ship;
         clear();
     }
 

@@ -1,4 +1,4 @@
-package com.rmarks.airships;
+package com.rmarks.airships.control;
 
 import com.rmarks.airships.entity.Ship;
 import net.minecraft.world.entity.player.Player;
