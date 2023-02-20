@@ -13,8 +13,9 @@ import org.apache.logging.log4j.Logger;
 
 // The value here should match an entry in the META-INF/mods.toml file
 @Mod(AirshipsMod.MOD_ID)
-public class AirshipsMod
-{
+public class AirshipsMod {
+    public static Logger logger;
+
     public static final String MOD_ID		= "airships";
     public static final String MOD_VERSION	= "0.0.1 v0.0.1";
     public static final String MOD_NAME	    = "Airships";
